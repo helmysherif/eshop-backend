@@ -3,6 +3,8 @@ const morgan = require("morgan");
 const dotenv = require("dotenv");
 const path = require("path");
 const rateLimit = require("express-rate-limit");
+const helmet = require("helmet");
+const hpp = require("hpp");
 const cors = require("cors");
 const compression = require("compression");
 const dbConnection = require("./config/database");
@@ -16,9 +18,46 @@ dotenv.config({ path: "config.env" });
 // db connection
 dbConnection();
 // middlewares
+// limit the size of the request body to 20kb to prevent large payloads from being sent to the server
 app.use(
   express.json({
     limit: "20kb",
+  })
+);
+// helmet is a middleware that helps to secure the app by setting various HTTP headers
+// to protect against common vulnerabilities such as cross-site scripting (XSS) and clickjacking
+app.use(helmet());
+// sanitize the request body to prevent NoSQL injection attacks
+// Custom sanitize middleware instead of express-mongo-sanitize
+app.use((req, _, next) => {
+  const sanitize = (obj) => {
+    if (!obj) return obj;
+    Object.keys(obj).forEach((key) => {
+      if (typeof obj[key] === "object") {
+        sanitize(obj[key]);
+      } else if (key.includes("$")) {
+        // Replace prohibited keys
+        const cleanKey = key.replace(/[$]/g, "_");
+        obj[cleanKey] = obj[key];
+        delete obj[key];
+      }
+    });
+  };
+  sanitize(req.body);
+  sanitize(req.query);
+  next();
+});
+// hpp is a middleware that helps to protect against HTTP Parameter Pollution attacks
+// by sanitizing the request query string and removing any duplicate or malicious parameters
+app.use(
+  hpp({
+    whitelist: [
+      "price",
+      "sold",
+      "quantity",
+      "ratingsAverage",
+      "ratingsQuantity",
+    ],
   })
 );
 // rate limiting middleware to limit the number of requests from a single IP

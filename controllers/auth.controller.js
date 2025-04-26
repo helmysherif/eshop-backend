@@ -6,6 +6,7 @@ const ApiError = require("../utils/apiError");
 const UserModel = require("../models/user.model");
 const sendEmail = require("../utils/sendEmail");
 const generateToken = require("../utils/createToken");
+const { sanitizeUser } = require("../utils/sanitizeData");
 // @desc signUp
 // @route POST /api/v1/auth/signup
 // @access public
@@ -23,7 +24,9 @@ exports.login = asyncHandler(async (req, res, next) => {
   if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
     return next(new ApiError("Incorrect email or password", 401));
   }
-  res.status(200).json({ data: user, token: generateToken(user._id) });
+  res
+    .status(200)
+    .json({ data: sanitizeUser(user), token: generateToken(user._id) });
 });
 // make sure the user is logged In
 exports.protect = asyncHandler(async (req, res, next) => {
